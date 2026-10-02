@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+      - name: Test
+        run: python -m pytest -q
+      - name: Console scripts
+        run: |
+          g4kit-proxy --help
+          g4kit-assets --help
+          g4kit-scorer-time --help
+          g4kit-fake-llm --help
+          g4kit-harness --help
+          g4kit-convert-openhands --help
+          g4kit-render-distill --help
+          g4kit-replay --help
+          g4kit-log-stats --help

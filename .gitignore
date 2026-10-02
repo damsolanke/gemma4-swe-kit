@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environments and secrets
+.venv/
+venv/
+.env
+.env.*
+
+# IDE
+.vscode/
+.cursor/
+.idea/
+*.swp
+.DS_Store
+
+# Runtime outputs and third-party assets that must never be committed
+*.jsonl
+!tests/fixtures/*.jsonl
+chat_template*.jinja
+!tests/fixtures/mini_chat_template.jinja
+gemma4_tool_parser.py
+*.whl
+*.safetensors
+*.parquet
+*.gguf
+runs/
+outputs/
+assets/
+data/
+wheels/
+mlx_adapters/
+submission/

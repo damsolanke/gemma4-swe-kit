@@ -1,0 +1,104 @@
+[
+ {
+  "type": "function",
+  "function": {
+   "name": "run_command",
+   "description": "Run a shell command in the repository.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "command": {
+      "type": "string",
+      "description": "Command line."
+     }
+    },
+    "required": [
+     "command"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "read_file",
+   "description": "Read lines of a file.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "filepath": {
+      "type": "string"
+     },
+     "start_line": {
+      "type": "integer"
+     },
+     "end_line": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "filepath"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "edit_file",
+   "description": "Replace text in a file.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "filepath": {
+      "type": "string"
+     },
+     "old_string": {
+      "type": "string"
+     },
+     "new_string": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "filepath",
+     "old_string",
+     "new_string"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "write_file",
+   "description": "Write a file.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "filepath": {
+      "type": "string"
+     },
+     "content": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "filepath",
+     "content"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "submit_patch",
+   "description": "Submit the working tree diff.",
+   "parameters": {
+    "type": "object",
+    "properties": {}
+   }
+  }
+ }
+]

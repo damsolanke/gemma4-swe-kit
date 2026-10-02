@@ -1,0 +1,9 @@
+{
+ "user_message": "Repository <<REPO>>.\n\nProblem Statement:\n<<PROBLEM_STATEMENT>>\n\n## Rules\n- be brief\n",
+ "tree_section": "\n## Workspace Layout\n```\n<<WORKSPACE_TREE>>\n```\n",
+ "placeholders": {
+  "repo": "<<REPO>>",
+  "problem_statement": "<<PROBLEM_STATEMENT>>",
+  "workspace_tree": "<<WORKSPACE_TREE>>"
+ }
+}

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemma4-swe-kit"
+version = "0.1.0"
+description = "Scorer-faithful local evaluation tools for Gemma 4 SWE agents: vLLM-like proxy, time estimator, harness smoke tests, replay and distillation utilities."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Dam Solanke" }]
+keywords = ["gemma", "gemma-4", "vllm", "agents", "swe-bench", "evaluation", "kaggle", "tool-calling"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["jinja2>=3.1"]
+
+[project.optional-dependencies]
+mlx = ["mlx-lm>=0.28"]
+tokenizer = ["tokenizers>=0.20"]
+distill = ["pyarrow>=14", "tokenizers>=0.20"]
+test = ["pytest>=7", "pyyaml>=6"]
+
+[project.scripts]
+g4kit-proxy = "gemma4_swe_kit.proxy.server:main"
+g4kit-assets = "gemma4_swe_kit.assets:main"
+g4kit-scorer-time = "gemma4_swe_kit.timing:main"
+g4kit-fake-llm = "gemma4_swe_kit.smoke:main"
+g4kit-harness = "gemma4_swe_kit.harness:main"
+g4kit-convert-openhands = "gemma4_swe_kit.distill.convert:main"
+g4kit-render-distill = "gemma4_swe_kit.distill.render:main"
+g4kit-replay = "gemma4_swe_kit.replay.run:main"
+g4kit-log-stats = "gemma4_swe_kit.logstats:main"
+
+[project.urls]
+Repository = "https://github.com/damsolanke/gemma4-swe-kit"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"

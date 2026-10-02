@@ -1,0 +1,89 @@
+{#- Minimal Gemma-4-style chat template for unit tests. Hand-written for this kit; it is modelled on the
+    official template's turn, tool-call and thinking-channel format and is NOT the official Gemma 4 template. -#}
+{%- macro arg(v) -%}
+    {%- if v is string -%}{{- '<|"|>' + v + '<|"|>' -}}
+    {%- elif v is boolean -%}{{- 'true' if v else 'false' -}}
+    {%- elif v is mapping -%}{{- '{' -}}{%- for k, x in v | dictsort -%}{{- k + ':' + arg(x) -}}{%- if not loop.last -%},{%- endif -%}{%- endfor -%}{{- '}' -}}
+    {%- elif v is none -%}{{- 'null' -}}
+    {%- elif v is sequence -%}{{- '[' -}}{%- for x in v -%}{{- arg(x) -}}{%- if not loop.last -%},{%- endif -%}{%- endfor -%}{{- ']' -}}
+    {%- else -%}{{- v -}}
+    {%- endif -%}
+{%- endmacro -%}
+{%- macro body(c) -%}
+    {%- if c is string -%}{{- c | trim -}}
+    {%- elif c is sequence -%}{%- for part in c -%}{{- part['text'] | trim -}}{%- endfor -%}
+    {%- endif -%}
+{%- endmacro -%}
+{{- bos_token -}}
+{%- set ns = namespace(last_user=-1, prev_role=None, state=None) -%}
+{%- set chat = messages -%}
+{%- if messages and messages[0]['role'] == 'system' -%}
+    {%- set chat = messages[1:] -%}
+{%- endif -%}
+{%- if enable_thinking or tools or chat | length < messages | length -%}
+    {{- '<|turn>system\n' -}}
+    {%- if enable_thinking -%}{{- '<|think|>\n' -}}{%- endif -%}
+    {%- if chat | length < messages | length -%}
+        {%- if messages[0]['content'] is string -%}{{- messages[0]['content'] | trim -}}
+        {%- else -%}{%- for part in messages[0]['content'] -%}{{- part['text'] | trim + ' ' -}}{%- endfor -%}
+        {%- endif -%}
+    {%- endif -%}
+    {%- for tool in tools or [] -%}
+        {{- '<|tool>declaration:' + tool['function']['name'] + '{description:' + arg(tool['function']['description'] or '') + '}<tool|>' -}}
+    {%- endfor -%}
+    {{- '<turn|>\n' -}}
+{%- endif -%}
+{%- for i in range(chat | length) -%}
+    {%- if chat[i]['role'] == 'user' -%}{%- set ns.last_user = i -%}{%- endif -%}
+{%- endfor -%}
+{%- for message in chat -%}
+    {%- if message['role'] == 'tool' -%}
+        {#- rendered together with the assistant message that made the call -#}
+    {%- elif message['role'] == 'assistant' -%}
+        {%- if ns.prev_role != 'assistant' -%}{{- '<|turn>model\n' -}}{%- endif -%}
+        {%- set ns.prev_role = 'assistant' -%}
+        {%- set thought = message.get('reasoning') or message.get('reasoning_content') -%}
+        {%- if thought and loop.index0 > ns.last_user and message.get('tool_calls') -%}
+            {{- '<|channel>thought\n' + thought + '\n<channel|>' -}}
+        {%- endif -%}
+        {%- for call in message.get('tool_calls') or [] -%}
+            {{- '<|tool_call>call:' + call['function']['name'] + arg(call['function']['arguments']) + '<tool_call|>' -}}
+        {%- endfor -%}
+        {%- set rs = namespace(n=0, done=false) -%}
+        {%- for k in range(loop.index0 + 1, chat | length) -%}
+            {%- if not rs.done and chat[k]['role'] == 'tool' -%}
+                {%- set rs.n = rs.n + 1 -%}
+                {%- set name = namespace(v='unknown') -%}
+                {%- for call in message.get('tool_calls') or [] -%}
+                    {%- if call.get('id') == chat[k].get('tool_call_id') -%}{%- set name.v = call['function']['name'] -%}{%- endif -%}
+                {%- endfor -%}
+                {{- '<|tool_response>response:' + name.v + '{value:' + arg(body(chat[k]['content'])) + '}<tool_response|>' -}}
+            {%- elif chat[k]['role'] != 'tool' -%}
+                {%- set rs.done = true -%}
+            {%- endif -%}
+        {%- endfor -%}
+        {%- set text = body(message['content']) -%}
+        {{- text -}}
+        {%- if message.get('tool_calls') and rs.n == 0 -%}
+            {{- '<|tool_response>' -}}
+            {%- set ns.state = 'tool_call' -%}
+        {%- elif rs.n > 0 and not text -%}
+            {%- set ns.state = 'tool_response' -%}
+        {%- else -%}
+            {{- '<turn|>\n' -}}
+            {%- set ns.state = 'turn_end' -%}
+        {%- endif -%}
+    {%- else -%}
+        {{- '<|turn>' + message['role'] + '\n' -}}
+        {%- if message['content'] is string -%}{{- message['content'] | trim -}}
+        {%- else -%}{%- for part in message['content'] -%}{{- part['text'] | trim -}}{%- endfor -%}
+        {%- endif -%}
+        {{- '<turn|>\n' -}}
+        {%- set ns.prev_role = message['role'] -%}
+        {%- set ns.state = 'turn_end' -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt and ns.state not in ('tool_response', 'tool_call') -%}
+    {{- '<|turn>model\n' -}}
+    {%- if not enable_thinking -%}{{- '<|channel>thought\n<channel|>' -}}{%- endif -%}
+{%- endif -%}

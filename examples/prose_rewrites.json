@@ -1,0 +1,14 @@
+[
+  [
+    "Search with `grep -rn \"<name>\" --include=\"\\*\\.py\" \\. \\| head -40`\\.",
+    "Search by calling run_command with a recursive grep for the name over the Python files, piped through head -40."
+  ],
+  [
+    "Run the related tests with `python -m pytest (\\S+) -q -x 2>&1 \\| tail -30`\\.",
+    "Run the related tests by calling run_command with python -m pytest on \\1, options -q -x, output piped through tail -30."
+  ],
+  [
+    "Check your change with `git diff`\\.",
+    "Check your change by calling run_command with git diff."
+  ]
+]
