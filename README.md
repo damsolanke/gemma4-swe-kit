@@ -4,6 +4,8 @@
 
 Local evaluation tools that reproduce the Kaggle "Gemma 4 Developer Agent" scorer (vLLM 0.19, Gemma 4 31B QAT, 4x L4) closely enough that prompts, call parsing, context limits and thinking budgets behave as on the scorer: a vLLM-like proxy over Ollama or MLX, a scorer-time estimator, a GPU-free harness smoke test, replay experiments and distillation data tools.
 
+<p align="center"><img src="docs/images/architecture.png" alt="Agent bundle and official harness send requests to g4kit-proxy, which renders, parses and enforces limits like the scorer's vLLM and forwards to Ollama or MLX; scorer-time and replay tools read the proxy logs, the fake LLM stands in for the model, and distillation data trains LoRA adapters" width="100%"></p>
+
 ## Why
 
 A typical local setup puts the agent in front of Ollama or LM Studio, which bring their own chat rendering and tool-call parsing. Those servers skip several things the scorer does, and each gap changes what the agent sees or how a task ends:
@@ -163,6 +165,7 @@ gemma4-swe-kit/
 │   └── distill/           # convert.py (OpenHands), render.py (training windows)
 ├── tests/                 # pytest suite with hand-written fixtures
 ├── examples/              # prose rewrite substitutions for g4kit-replay
+├── docs/                  # make_architecture.py and the rendered diagram in docs/images/
 ├── .github/workflows/ci.yml
 ├── LICENSE
 └── NOTICE
