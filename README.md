@@ -34,7 +34,7 @@ Numbers from the competition runs that produced this kit (with these tools or th
 | Tool-result encoding drove failed edits (old harness) | Replay of 30 contexts built from real tasks, 3 samples each (15 tasks produced edit calls): failed `edit_file` calls 22% with the old double encoding, 62% with single-level JSON, 0% with raw text. Since the 2026-09-30 harness, `edit_file` retries without escapes, so escape copies no longer fail; lost arguments remain (4/45 double, 7/40 single) |
 | Rendering past turns differently changes behaviour | Re-inserting the empty thought blocks the template drops (to keep Ollama's sliding-window cache) made 95% of requests pure prefix extensions and gave about 40% more throughput, but tasks with coder loops went from 6/13 to 3/35 and analyzer runaways from 0/13 to 9/35 (different task subsets). It stays off by default |
 | Scorer cost per call | 0.6 s + completion tokens / 25.5 tok/s on 4x L4 (three evaluation arms sharing one vLLM server, so slightly pessimistic) |
-| Parser parity | On 60,000 random argument strings the built-in parser returns the same result as vLLM 0.19.1's on all 59,915 where vLLM returns. On the other 85, vLLM's parser never returns (an infinite loop in `_parse_gemma4_array`); the kit detects that input |
+| Parser parity | On 60,000 random argument strings from the test generator (seed 7) the built-in parser returns the same result as vLLM 0.19.1's on all 59,926 where vLLM returns. On the other 74, vLLM's parser never returns (an infinite loop in `_parse_gemma4_array`); the kit detects that input |
 | Renderer parity | Same prompt as transformers' renderer on a multi-turn tool-calling conversation, for both Gemma 4 templates, thinking on and off |
 
 ## Components
