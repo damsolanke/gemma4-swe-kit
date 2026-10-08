@@ -180,7 +180,7 @@ At most 8 trajectories per repository (`--max-per-repo`) and 2 per instance are 
 
 Released as a CC-BY-4.0 dataset: the converted corpus (3,586 trajectories), the curated subset (1,427) and every trajectory's scores.
 
-Dataset: (link added at release)
+Dataset: https://www.kaggle.com/datasets/adesolanke/gemma4-swe-agent-trajectories (CC BY 4.0; derived from SWE-rebench OpenHands trajectories by Nebius)
 
 ### Error-turn masking: `g4kit-render-distill --mask-error-turns`
 

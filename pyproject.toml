@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gemma4-swe-kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Scorer-faithful local evaluation tools for Gemma 4 SWE agents: vLLM-like proxy, time estimator, harness smoke tests, replay, distillation data, LoRA training and adapter checks."
 readme = "README.md"
 requires-python = ">=3.11"

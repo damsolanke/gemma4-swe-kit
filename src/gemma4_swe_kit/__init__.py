@@ -14,4 +14,4 @@ Modules:
     logstats   Per-session loop, edit-failure and malformed-call statistics from proxy logs.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
