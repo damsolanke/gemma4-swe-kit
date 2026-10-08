@@ -38,6 +38,7 @@ g4kit-render-distill = "gemma4_swe_kit.distill.render:main"
 g4kit-train-mlx = "gemma4_swe_kit.lora.train_mlx:main"
 g4kit-mlx-to-peft = "gemma4_swe_kit.lora.mlx_to_peft:main"
 g4kit-check-peft = "gemma4_swe_kit.lora.check_peft:main"
+g4kit-canary = "gemma4_swe_kit.canary:main"
 g4kit-replay = "gemma4_swe_kit.replay.run:main"
 g4kit-log-stats = "gemma4_swe_kit.logstats:main"
 
