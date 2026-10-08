@@ -7,7 +7,9 @@ Modules:
     timing     Scorer wall-time estimate from a local run's per-call token counts.
     smoke      Scripted fake model for end-to-end harness smoke tests without a GPU.
     harness    Local runner for the official harness with the scorer's compaction settings.
-    distill    OpenHands trajectory conversion and training-window rendering.
+    distill    OpenHands trajectory conversion, trajectory curation and training-window rendering.
+    lora       MLX LoRA trainer, mlx_lm to PEFT conversion and PEFT key checks.
+    canary     Logit canary: do the adapters a vLLM server serves change the model?
     replay     Replay logged requests under prompt or sampling changes, with pluggable metrics.
     logstats   Per-session loop, edit-failure and malformed-call statistics from proxy logs.
 """

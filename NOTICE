@@ -29,3 +29,20 @@ Third-party material and attributions
    Not distributed here. The proxy reads chat_template.jinja from a path the user supplies.
    The test fixture tests/fixtures/mini_chat_template.jinja is a small hand-written template
    that is modelled on the official template's turn format, for unit tests only.
+
+4. SWE-Lego error masking (a training rule; no code or data from that work is included)
+   Tao, C., Chen, J., Jiang, Y., et al. "SWE-Lego: Pushing the Limits of Supervised Fine-tuning for Software
+   Issue Resolving", arXiv:2601.01426, 2026.
+   g4kit-curate's tool-error rule and g4kit-render-distill --mask-error-turns tool adapt the error masking of
+   its fine-tuning procedure: no loss on a turn whose tool call failed because of the call itself (file-tool
+   errors, shell invocation errors, pytest usage errors), while failing tests and reproduction runs stay trained.
+
+5. LoRA Without Regret (a parametrization; no code is included)
+   Schulman, J. and Thinking Machines Lab, "LoRA Without Regret", Sep 29, 2025,
+   https://thinkingmachines.ai/blog/lora/.
+   examples/tpu uses its LoRA parametrization (alpha 32 with scale alpha / r, A initialized uniformly with
+   scale 1/sqrt(d_in), B at zero) and its learning-rate guidance for the sweep.
+
+6. Tunix and Qwix (Apache License 2.0), https://github.com/google/tunix and https://github.com/google/qwix
+   examples/tpu installs both inside the Kaggle kernel from its pinned lock file and maps their LoRA parameter
+   layouts to PEFT's; no code from them is included here.

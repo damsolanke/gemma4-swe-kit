@@ -34,6 +34,11 @@ jobs:
           g4kit-fake-llm --help
           g4kit-harness --help
           g4kit-convert-openhands --help
+          g4kit-curate --help
           g4kit-render-distill --help
+          g4kit-train-mlx --help
+          g4kit-mlx-to-peft --help
+          g4kit-check-peft --help
+          g4kit-canary --help
           g4kit-replay --help
           g4kit-log-stats --help
