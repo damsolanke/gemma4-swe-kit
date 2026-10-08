@@ -12,6 +12,7 @@ from gemma4_swe_kit.chat import ChatRenderer
 FIXTURES = Path(__file__).parent / "fixtures"
 OFFICIAL_TEMPLATE = os.environ.get("G4KIT_TEST_OFFICIAL_TEMPLATE")   # set locally to run parity tests
 OFFICIAL_PARSER = os.environ.get("G4KIT_TEST_OFFICIAL_PARSER")
+FUZZ_PARSER = os.environ.get("G4KIT_TEST_FUZZ_PARSER")                # the same file; runs the slow 60,000-draw fuzz
 
 
 @pytest.fixture
