@@ -13,6 +13,12 @@ only), roughly the raw tail that ADK compaction keeps.
   --mode nothink   tool calls only; the first model turn follows the empty thought block of the thinking-off prompt
   --encoding single  one JSON level, ensure_ascii False (the scorer since 2026-09-30)
   --encoding double  a JSON string wrapped as {"result": ...} (the harness before 2026-09-30)
+  --mask-error-turns off   every assistant turn is trained (the default; output unchanged)
+                     tool  no loss on an assistant turn whose tool call returned a tool error as g4kit-curate defines
+                           it (file-tool errors, shell invocation errors, pytest usage errors); failing tests and
+                           reproduction runs stay trained, as in SWE-Lego's error masking
+                     all   no loss on any turn whose tool result has status error
+                     A masked turn stays in the context; a window left without a trained turn is not written.
 
 Inputs you provide (none ship with the kit): the system prompt of your agent (``{problem_description}`` is
 replaced by the issue, as the harness's instruction templating does), the harness's first-user-message template
@@ -26,11 +32,12 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Collection
 
 from .. import assets
 from ..chat import ChatRenderer, to_conversation
 from ..toolcalls import EMPTY_THOUGHT
+from .curate import tool_error
 
 MODEL_HEAD = "<|turn>model\n"
 
@@ -96,8 +103,31 @@ def build_messages(conv: dict, system: str, tpl: dict, mode: str, encoding: str)
     return msgs
 
 
-def spans(renderer: ChatRenderer, msgs: list[dict], tools: list[dict], mode: str) -> list[tuple[str, int]]:
-    """[(text, train)] covering the fully rendered conversation."""
+def error_turns(conv: dict, how: str) -> set[int]:
+    """Indices into conv["messages"] of assistant turns to leave untrained (--mask-error-turns)."""
+    if how == "off":
+        return set()
+    msgs, out = conv["messages"], set()
+    for k, m in enumerate(msgs):
+        if m["role"] != "assistant" or not m.get("tool_calls"):
+            continue
+        calls = {tc["id"]: tc["function"] for tc in m["tool_calls"]}
+        for r in msgs[k + 1:]:
+            if r["role"] != "tool":
+                break
+            f = calls.get(r["tool_call_id"])
+            res = json.loads(r["content"])
+            if f is None or res.get("status") != "error":
+                continue
+            if how == "all" or tool_error(f["name"], f["arguments"], res):
+                out.add(k)
+    return out
+
+
+def spans(renderer: ChatRenderer, msgs: list[dict], tools: list[dict], mode: str,
+          untrained: Collection[int] = frozenset()) -> list[tuple[str, int]]:
+    """[(text, train)] covering the fully rendered conversation; assistant messages whose index is in
+    ``untrained`` get train=0."""
     def render(ms: list[dict]) -> str:
         return renderer.render_conversation(to_conversation(ms, renderer.content_format), tools,
                                             add_generation_prompt=False, enable_thinking=(mode == "think"))
@@ -121,7 +151,7 @@ def spans(renderer: ChatRenderer, msgs: list[dict], tools: list[dict], mode: str
         out.append((full[pos:a] + head, 0))
         if seg.endswith("<turn|>\n"):           # generation stops at <turn|>; the newline is template glue
             seg, b = seg[:-1], b - 1
-        out.append((seg, 1))
+        out.append((seg, 0 if k in untrained else 1))
         pos = b
     if pos < len(full):
         out.append((full[pos:], 0))
@@ -133,7 +163,7 @@ def windows(segs: list[tuple[str, int]], encode: Callable[[str], list[int]], max
     """Split [(text, train)] into windows of at most max_len tokens.
 
     segs alternates context / target; segs[0] is the system + user header (+ first model-turn head).
-    Returns [(segments, trained turn count)].
+    Returns [(segments, trained turn count)]; a window whose targets are all untrained is dropped.
     """
     toks = [encode(t) for t, _ in segs]
     header, hdr_len = segs[0], len(toks[0])
@@ -158,12 +188,16 @@ def windows(segs: list[tuple[str, int]], encode: Callable[[str], list[int]], max
         if e <= s:            # the next trained unit does not fit even with minimal context
             break
         w: list[list] = [[header[0], 0]]
+        trained = 0
         for u in range(start, e):
             t, c = units[u]
-            w.append([segs[t][0], 1 if u >= s else 0])
+            on = 1 if u >= s and segs[t][1] else 0
+            trained += on
+            w.append([segs[t][0], on])
             if c is not None and u < e - 1:
                 w.append([segs[c][0], 0])
-        res.append((w, e - s))
+        if trained:           # with --mask-error-turns every target can be masked: nothing to learn from the window
+            res.append((w, trained))
         s = e
     return res
 
@@ -191,6 +225,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--valid-frac", type=float, default=0.02)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--exclude-repos", default="", help="comma list, e.g. repositories of your local eval tasks")
+    ap.add_argument("--mask-error-turns", choices=["off", "tool", "all"], default="off",
+                    help="no loss on assistant turns whose tool call returned an error: tool = errors caused by the "
+                         "call (g4kit-curate's rule), all = any error result")
     a = ap.parse_args(argv)
     if bool(a.tools) == bool(a.tools_from_log):
         raise SystemExit("give exactly one of --tools and --tools-from-log")
@@ -203,7 +240,7 @@ def main(argv: list[str] | None = None) -> int:
     excl = set(filter(None, a.exclude_repos.split(",")))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    n_traj = n_win = n_turn = 0
+    n_traj = n_win = n_turn = n_masked = 0
     with open(out / "train.jsonl", "w", encoding="utf-8") as ft, open(out / "valid.jsonl", "w", encoding="utf-8") as fv, \
             open(a.conv, encoding="utf-8") as fin:
         for i, line in enumerate(fin):
@@ -212,7 +249,9 @@ def main(argv: list[str] | None = None) -> int:
             conv = json.loads(line)
             if conv["repo"] in excl:
                 continue
-            segs = spans(renderer, build_messages(conv, system, tpl, a.mode, a.encoding), tools, a.mode)
+            untrained = {k + 2 for k in error_turns(conv, a.mask_error_turns)}   # build_messages adds system + user
+            n_masked += len(untrained)
+            segs = spans(renderer, build_messages(conv, system, tpl, a.mode, a.encoding), tools, a.mode, untrained)
             dest = fv if is_valid(conv["instance_id"], a.valid_frac) else ft
             for w, nt in windows(segs, encode, a.max_len):
                 dest.write(json.dumps({"segments": w, "instance_id": conv["instance_id"], "turns": nt},
@@ -220,7 +259,8 @@ def main(argv: list[str] | None = None) -> int:
                 n_win += 1
                 n_turn += nt
             n_traj += 1
-    print(f"{n_traj} trajectories -> {n_win} windows, {n_turn} trained turns ({a.mode}, {a.encoding}, max_len {a.max_len})")
+    print(f"{n_traj} trajectories -> {n_win} windows, {n_turn} trained turns ({a.mode}, {a.encoding}, max_len {a.max_len})"
+          + (f"; {n_masked} error turns untrained ({a.mask_error_turns})" if a.mask_error_turns != "off" else ""))
     return 0
 
 

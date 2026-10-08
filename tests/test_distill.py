@@ -6,7 +6,8 @@ from conftest import FIXTURES
 
 from gemma4_swe_kit.chat import to_conversation
 from gemma4_swe_kit.distill.convert import Conv, Skip, convert_rows, iter_rows
-from gemma4_swe_kit.distill.render import build_messages, load_user_template, spans, tools_from_log, windows
+from gemma4_swe_kit.distill.render import (build_messages, error_turns, load_user_template, main, spans,
+                                          tools_from_log, windows)
 from gemma4_swe_kit.toolcalls import EMPTY_THOUGHT
 
 
@@ -109,3 +110,78 @@ def test_tools_from_log_subset(tmp_path, tools):
     log.write_text(json.dumps({"body": {"tools": tools + [{"type": "function", "function": {"name": "helper"}}]}}) + "\n")
     picked = tools_from_log(str(log), ["read_file", "run_command"])
     assert [t["function"]["name"] for t in picked] == ["read_file", "run_command"]
+
+
+def conv_with_errors():
+    """Calls whose results are: a read_file error (tool error), a failing test run (expected), an empty grep (expected),
+    a missing command (tool error), then an edit and submit_patch."""
+    steps = [("read_file", {"filepath": "nope.py"}, {"status": "error", "error_type": "FileReadError",
+                                                     "error_message": "File not found: nope.py"}),
+             ("run_command", {"command": "python -m pytest -q tests/test_core.py"},
+              {"status": "error", "error_type": "CommandError", "error_message": "1 failed",
+               "details": {"stdout": "1 failed", "stderr": "", "exit_code": 1}}),
+             ("run_command", {"command": "grep -rn widen docs"},
+              {"status": "error", "error_type": "CommandError", "error_message": "",
+               "details": {"stdout": "", "stderr": "", "exit_code": 1}}),
+             ("run_command", {"command": "pytset -q"},
+              {"status": "error", "error_type": "CommandError", "error_message": "pytset: command not found",
+               "details": {"stdout": "", "stderr": "pytset: command not found", "exit_code": 127}}),
+             ("edit_file", {"filepath": "widgets/core.py", "old_string": "abs(pad)", "new_string": "max(pad, 0)"},
+              {"status": "ok"}),
+             ("submit_patch", {}, {"status": "ok", "patch_size": 10, "files_changed": 1})]
+    msgs = []
+    for i, (name, args, result) in enumerate(steps):
+        msgs.append({"role": "assistant", "content": None, "reasoning": None,
+                     "tool_calls": [{"id": f"c{i}", "type": "function", "function": {"name": name, "arguments": args}}]})
+        msgs.append({"role": "tool", "tool_call_id": f"c{i}", "name": name, "content": json.dumps(result)})
+    msgs.append({"role": "assistant", "content": "Submitted the fix.", "reasoning": None})
+    return {"instance_id": "acme__widgets-7", "repo": "acme/widgets", "issue": "widen() grows on negative pad",
+            "n_turns": len(steps), "messages": msgs}
+
+
+def test_error_turn_rules():
+    conv = conv_with_errors()
+    assert error_turns(conv, "off") == set()
+    assert error_turns(conv, "tool") == {0, 6}                 # the file-tool error and the missing command
+    assert error_turns(conv, "all") == {0, 2, 4, 6}            # every result with status error
+
+
+@pytest.mark.parametrize("how,trained", [("off", 7), ("tool", 5), ("all", 3)])
+def test_masked_turns_stay_in_context(mini_renderer, tools, how, trained):
+    conv = conv_with_errors()
+    tpl = load_user_template(str(FIXTURES / "user_template.json"))
+    msgs = build_messages(conv, "S", tpl, "nothink", "single")
+    untrained = {k + 2 for k in error_turns(conv, how)}
+    segs = spans(mini_renderer, msgs, tools, "nothink", untrained)
+    assert sum(flag for _, flag in segs) == trained
+    assert "".join(t for t, _ in segs) == "".join(t for t, _ in spans(mini_renderer, msgs, tools, "nothink"))
+    masked = [t for i, (t, flag) in enumerate(segs) if i % 2 == 1 and not flag]
+    assert len(masked) == 7 - trained and all("<|tool_call>call:" in t for t in masked)
+    (w, n), = windows(segs, mock_encode, max_len=100_000)
+    assert n == trained
+    assert [text for text, _ in w] == [text for text, _ in segs[:-1]]            # all but the closing context
+    assert [flag for _, flag in w] == [flag for _, flag in segs[:-1]]
+
+
+def test_mask_off_renders_as_before(converted, mini_renderer, tools):
+    """off leaves every turn trained; test_windows_split_with_context_turns pins the unmasked windows."""
+    conv = converted[0][0]
+    tpl = load_user_template(str(FIXTURES / "user_template.json"))
+    msgs = build_messages(conv, "S", tpl, "nothink", "single")
+    plain = spans(mini_renderer, msgs, tools, "nothink")
+    assert spans(mini_renderer, msgs, tools, "nothink", {k + 2 for k in error_turns(conv, "off")}) == plain
+    assert error_turns(conv, "tool") == error_turns(conv, "all") == set()      # the fixture has no failing call
+
+
+def test_window_without_trained_turn_is_dropped():
+    """header 10 tokens; units of 10, 10 and 5 tokens; the first two targets are masked; max_len 30."""
+    segs = [("h " * 10, 0), ("t1 " * 5, 0), ("c1 " * 5, 0), ("t2 " * 5, 0), ("c2 " * 5, 0), ("t3 " * 5, 1)]
+    out = windows(segs, mock_encode, max_len=30)
+    assert [[flag for _, flag in w] for w, _ in out] == [[0, 0, 0, 1]]
+    assert [n for _, n in out] == [1]
+
+
+def test_mask_option_choices(tmp_path):
+    with pytest.raises(SystemExit):
+        main([str(tmp_path / "conv.jsonl"), str(tmp_path / "out"), "--system-prompt", "s", "--user-template", "u",
+              "--tokenizer", "t", "--tools", "x", "--mask-error-turns", "some"])
