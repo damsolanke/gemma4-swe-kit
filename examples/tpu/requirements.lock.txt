@@ -330,7 +330,7 @@ tqdm==4.70.1
     #   kagglehub
     #   tensorflow-datasets
     #   transformers
-transformers==4.57.6
+transformers==5.10.1
     # via google-tunix
 treescope==0.1.10
     # via flax
